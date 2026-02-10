@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Metal Weight Calculator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/gh/rastikerdar/vazirmatn@v33.003/Vazirmatn-font-face.css" rel="stylesheet" type="text/css" />
+    <style>
+        body {
+            font-family: 'Vazirmatn', 'Tahoma', sans-serif;
+            background: #FFFFFF;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(30px);
+            border: 1.5px solid rgba(255, 255, 255, 0.9);
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.08);
+            transition: all 0.3s;
+        }
+
+        .glass-input {
+            background: rgba(255, 255, 255, 0.7);
+            border: 1.5px solid rgba(229, 231, 235, 0.8);
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.03);
+            color: #1f2937;
+            transition: all 0.3s;
+            font-family: 'Tahoma', sans-serif;
+        }
+
+        .glass-input:focus {
+            background: rgba(255, 255, 255, 0.85);
+            border-color: rgba(156, 163, 175, 0.8);
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        #intro-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #FFFFFF;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 1.5s;
+        }
+
+        #intro-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .intro-text {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+            font-weight: 700;
+            color: #1a1a1a;
+            opacity: 0;
+            transform: translateY(30px);
+            transition: all 1.8s cubic-bezier(0.22, 1, 0.36, 1);
+        }
+
+        #intro-hello {
+            font-size: clamp(3rem, 12vw, 5rem);
+        }
+
+        #intro-welcome {
+            font-size: clamp(1.5rem, 6vw, 2.5rem);
+            margin-top: 2rem;
+        }
+
+        .user-badge {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 8px 16px;
+            border-radius: 9999px;
+            background: rgba(255, 255, 255, 0.85);
+            border: 1.5px solid rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(15px);
+            box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+            z-index: 50;
+        }
+
+        .nav-tab {
+            position: relative;
+            transition: all 0.3s;
+        }
+
+        .nav-tab.active {
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            font-weight: 700;
+        }
+
+        .app-container {
+            opacity: 0;
+            transition: opacity 1s;
+        }
+
+        .app-visible {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <!-- Login Overlay -->
+    <div id="login-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #FFFFFF; z-index: 10000; display: flex; justify-content: center; align-items: center;">
+        <div class="glass-panel p-8 rounded-3xl flex flex-col gap-5 w-full max-w-sm text-center">
+            <h2 class="text-2xl font-bold">خوش آمدید</h2>
+            <input type="text" id="login-fname" class="glass-input w-full h-12 rounded-xl text-center text-lg" placeholder="نام">
+            <input type="text" id="login-lname" class="glass-input w-full h-12 rounded-xl text-center text-lg" placeholder="نام خانوادگی">
+            <button onclick="submitLogin()" class="glass-panel w-full h-12 rounded-xl font-bold text-lg hover:bg-white/90 transition-all">ورود</button>
+        </div>
+    </div>
+
+    <!-- Intro Overlay -->
+    <div id="intro-overlay">
+        <div id="intro-hello" class="intro-text">Hello</div>
+        <div id="intro-welcome" class="intro-text hidden">Welcome</div>
+    </div>
+
+    <!-- Main App -->
+    <div id="main-app" class="app-container w-full max-w-md px-4">
+        <div id="user-badge" class="user-badge hidden"></div>
+
+        <header class="mb-6 text-center">
+            <h1 class="text-3xl font-bold text-gray-800">محاسبه‌گر وزن فلزات</h1>
+        </header>
+
+        <main class="glass-panel rounded-3xl p-6">
+            <!-- Navigation -->
+            <div class="glass-panel rounded-full p-1.5 flex gap-1 mb-6">
+                <button onclick="switchTab('calc')" id="tab-calc" class="nav-tab active flex-1 py-2 rounded-full text-sm">محاسبه</button>
+                <button onclick="switchTab('settings')" id="tab-settings" class="nav-tab flex-1 py-2 rounded-full text-sm">تنظیمات</button>
+            </div>
+
+            <!-- Content Area -->
+            <div id="content-area"></div>
+        </main>
+    </div>
+
+    <script>
+        let userData = { firstName: '', lastName: '' };
+        let currentTab = 'calc';
+
+        // Metal densities (g/cm³)
+        const metalDensities = {
+            'gold': 19.32,
+            'silver': 10.49,
+            'copper': 8.96,
+            'aluminum': 2.70,
+            'iron': 7.87,
+            'platinum': 21.45,
+            'titanium': 4.51,
+            'zinc': 7.14,
+            'nickel': 8.91,
+            'tin': 7.31
+        };
+
+        const metalNames = {
+            'gold': 'طلا',
+            'silver': 'نقره',
+            'copper': 'مس',
+            'aluminum': 'آلومینیوم',
+            'iron': 'آهن',
+            'platinum': 'پلاتین',
+            'titanium': 'تیتانیوم',
+            'zinc': 'روی',
+            'nickel': 'نیکل',
+            'tin': 'قلع'
+        };
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            checkUserAndStart();
+        });
+
+        function checkUserAndStart() {
+            const savedFName = localStorage.getItem('metal_calc_fname');
+            const savedLName = localStorage.getItem('metal_calc_lname');
+
+            if (savedFName && savedLName) {
+                userData.firstName = savedFName;
+                userData.lastName = savedLName;
+                startIntro();
+            } else {
+                document.getElementById('login-overlay').style.display = 'flex';
+            }
+        }
+
+        function submitLogin() {
+            const fName = document.getElementById('login-fname').value.trim();
+            const lName = document.getElementById('login-lname').value.trim();
+
+            if (!fName || !lName) {
+                alert('لطفاً نام و نام خانوادگی را وارد کنید');
+                return;
+            }
+
+            localStorage.setItem('metal_calc_fname', fName);
+            localStorage.setItem('metal_calc_lname', lName);
+            userData.firstName = fName;
+            userData.lastName = lName;
+
+            const loginOverlay = document.getElementById('login-overlay');
+            loginOverlay.style.opacity = '0';
+            setTimeout(() => {
+                loginOverlay.style.display = 'none';
+                startIntro();
+            }, 1000);
+        }
+
+        function startIntro() {
+            const overlay = document.getElementById('intro-overlay');
+            const hello = document.getElementById('intro-hello');
+            const welcome = document.getElementById('intro-welcome');
+            const mainApp = document.getElementById('main-app');
+            const badge = document.getElementById('user-badge');
+
+            badge.innerText = `${userData.firstName} عزیز`;
+            badge.classList.remove('hidden');
+
+            overlay.classList.add('active');
+
+            setTimeout(() => {
+                hello.style.opacity = '1';
+                hello.style.transform = 'translateY(0)';
+            }, 300);
+
+            setTimeout(() => {
+                hello.style.opacity = '0';
+                hello.style.transform = 'translateY(-30px)';
+            }, 1800);
+
+            setTimeout(() => {
+                hello.style.display = 'none';
+                welcome.classList.remove('hidden');
+                welcome.style.opacity = '1';
+                welcome.style.transform = 'translateY(0)';
+            }, 2300);
+
+            setTimeout(() => {
+                overlay.style.opacity = '0';
+                mainApp.classList.add('app-visible');
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                    renderCalc();
+                }, 1500);
+            }, 5000);
+        }
+
+        function switchTab(tab) {
+            currentTab = tab;
+            document.querySelectorAll('.nav-tab').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById(`tab-${tab}`).classList.add('active');
+
+            if (tab === 'calc') {
+                renderCalc();
+            } else {
+                renderSettings();
+            }
+        }
+
+        function renderCalc() {
+            const container = document.getElementById('content-area');
+            
+            let metalOptions = '';
+            for (const [key, name] of Object.entries(metalNames)) {
+                metalOptions += `<option value="${key}">${name}</option>`;
+            }
+
+            container.innerHTML = `
+                <div class="flex flex-col gap-4">
+                    <div>
+                        <label class="block text-sm font-semibold text-gray-700 mb-2">نوع فلز:</label>
+                        <select id="metal-select" class="glass-input w-full h-12 rounded-xl text-center">
+                            ${metalOptions}
+                        </select>
+                    </div>
+
+                    <div class="glass-panel rounded-2xl p-4">
+                        <label class="block text-sm font-semibold text-gray-700 mb-3 text-center">ابعاد (سانتی‌متر)</label>
+                        <div class="flex gap-3">
+                            <div class="flex-1">
+                                <input type="number" id="length" class="glass-input w-full h-12 rounded-xl text-center" placeholder="طول" step="0.01">
+                            </div>
+                            <div class="flex-1">
+                                <input type="number" id="width" class="glass-input w-full h-12 rounded-xl text-center" placeholder="عرض" step="0.01">
+                            </div>
+                            <div class="flex-1">
+                                <input type="number" id="height" class="glass-input w-full h-12 rounded-xl text-center" placeholder="ارتفاع" step="0.01">
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="calculateWeight()" class="glass-panel w-full h-14 rounded-xl font-bold text-lg hover:bg-white/90 transition-all" style="background: rgba(220, 252, 231, 0.7); color: #059669;">محاسبه وزن</button>
+
+                    <div id="result" class="glass-panel rounded-2xl p-6 text-center min-h-[100px] flex items-center justify-center">
+                        <span class="text-gray-500">نتیجه اینجا نمایش داده می‌شود</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function calculateWeight() {
+            const metal = document.getElementById('metal-select').value;
+            const length = parseFloat(document.getElementById('length').value);
+            const width = parseFloat(document.getElementById('width').value);
+            const height = parseFloat(document.getElementById('height').value);
+            const resultDiv = document.getElementById('result');
+
+            if (isNaN(length) || isNaN(width) || isNaN(height) || length <= 0 || width <= 0 || height <= 0) {
+                resultDiv.innerHTML = '<span class="text-red-600 font-bold">لطفاً تمام ابعاد را به درستی وارد کنید</span>';
+                return;
+            }
+
+            const volume = length * width * height; // cm³
+            const density = metalDensities[metal];
+            const weight = volume * density; // grams
+
+            const weightKg = weight / 1000;
+
+            resultDiv.innerHTML = `
+                <div class="flex flex-col gap-3 w-full">
+                    <div class="text-2xl font-bold text-green-700">${metalNames[metal]}</div>
+                    <div class="flex flex-col gap-2">
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600">حجم:</span>
+                            <span class="font-mono font-bold">${volume.toFixed(2)} cm³</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600">چگالی:</span>
+                            <span class="font-mono font-bold">${density} g/cm³</span>
+                        </div>
+                        <div class="h-px bg-gray-300 my-2"></div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-base font-bold text-gray-800">وزن:</span>
+                            <span class="text-xl font-mono font-bold text-blue-700">${weight.toFixed(2)} گرم</span>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-sm text-gray-600">معادل:</span>
+                            <span class="font-mono font-bold">${weightKg.toFixed(4)} کیلوگرم</span>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderSettings() {
+            const container = document.getElementById('content-area');
+            container.innerHTML = `
+                <div class="flex flex-col gap-6">
+                    <div class="glass-panel rounded-2xl p-6 flex flex-col items-center gap-3">
+                        <div class="w-16 h-16 rounded-full bg-gray-300/50 flex items-center justify-center text-3xl">👤</div>
+                        <div class="text-sm text-gray-500">کاربر فعلی</div>
+                        <div class="text-lg font-bold text-gray-800">${userData.firstName} ${userData.lastName}</div>
+                    </div>
+
+                    <div class="glass-panel rounded-2xl p-6">
+                        <h3 class="font-bold text-center mb-3 border-b border-gray-300/30 pb-2">اعتبارات</h3>
+                        <div class="flex flex-col gap-3 text-sm">
+                            <div>
+                                <div class="text-xs text-gray-500">طراح و برنامه‌نویس:</div>
+                                <div class="font-bold">امیرحسین نادری</div>
+                            </div>
+                            <div>
+                                <div class="text-xs text-gray-500">اسپانسر و ایده‌پرداز:</div>
+                                <div class="font-bold">ابوالفضل حضرتی‌زاده</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <button onclick="logout()" class="glass-panel w-full h-12 rounded-xl font-bold hover:bg-red-50 transition-all" style="color: #dc2626;">خروج از حساب کاربری</button>
+                </div>
+            `;
+        }
+
+        function logout() {
+            if (confirm('آیا مطمئن هستید که می‌خواهید خارج شوید؟')) {
+                localStorage.removeItem('metal_calc_fname');
+                localStorage.removeItem('metal_calc_lname');
+                location.reload();
+            }
+        }
+    </script>
+</body>
+</html>
